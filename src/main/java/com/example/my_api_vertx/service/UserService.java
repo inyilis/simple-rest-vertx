@@ -1,159 +1,129 @@
 package com.example.my_api_vertx.service;
 
-import io.vertx.core.AbstractVerticle;
-import io.vertx.core.eventbus.Message;
+import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.JWTOptions;
-import io.vertx.ext.auth.PubSecKeyOptions;
 import io.vertx.ext.auth.jwt.JWTAuth;
-import io.vertx.ext.auth.jwt.JWTAuthOptions;
+import io.vertx.ext.web.RoutingContext;
 import io.vertx.jdbcclient.JDBCPool;
 import io.vertx.sqlclient.Row;
-import io.vertx.sqlclient.RowSet;
-import io.vertx.sqlclient.SqlResult;
 import io.vertx.sqlclient.templates.SqlTemplate;
 import io.vertx.sqlclient.templates.TupleMapper;
 
 import java.util.*;
 
-public class UserService extends AbstractVerticle {
+public class UserService {
 
-  private JWTAuth jwt;
-
-  private JDBCPool client;
-  private SqlTemplate<Map<String, Object>, RowSet<JsonObject>> loginUserTmpl;
-  private SqlTemplate<Map<String, Object>, RowSet<JsonObject>> getUserTmpl;
-  private SqlTemplate<Map<String, Object>, RowSet<JsonObject>> delUserTmpl;
-  private SqlTemplate<JsonObject, SqlResult<Void>> addUserTmpl;
-  private SqlTemplate<JsonObject, SqlResult<Void>> editUserTmpl;
-
-  @Override
-  public void start() {
-    setUpInitialData();
-
-    // Create a JWT Auth Provider
-    jwt = JWTAuth.create(vertx, new JWTAuthOptions()
-      .addPubSecKey(new PubSecKeyOptions()
-        .setAlgorithm("HS256")
-        .setBuffer("keyboard cat")));
-
-    vertx.eventBus().consumer("login.addr", this::handleLoginUser);
-    vertx.eventBus().consumer("list.user.addr", this::handleListUsers);
-    vertx.eventBus().consumer("get.user.addr", this::handleGetUser);
-    vertx.eventBus().consumer("add.user.addr", this::handleAddUser);
-    vertx.eventBus().consumer("edit.user.addr", this::handleEditUser);
-    vertx.eventBus().consumer("del.user.addr", this::handleDelUser);
-  }
-
-  private void setUpInitialData() {
-    // Create a JDBC client with a test database
-    client = JDBCPool.pool(vertx, new JsonObject()
-      .put("url", "jdbc:hsqldb:mem:test?shutdown=true")
-      .put("driver_class", "org.hsqldb.jdbcDriver"));
-    getUserTmpl = SqlTemplate
-      .forQuery(client, "SELECT * FROM users WHERE id = #{id}")
-      .mapTo(Row::toJson);
-    loginUserTmpl = SqlTemplate
-      .forQuery(client, "SELECT * FROM users where username = #{username} and password = #{password}")
-      .mapTo(Row::toJson);
-    addUserTmpl = SqlTemplate
-      .forUpdate(client, "INSERT INTO users (username, email, password, role) VALUES (#{username}, #{email}, #{password}, #{role})")
-      .mapFrom(TupleMapper.jsonObject());
-    editUserTmpl = SqlTemplate
-      .forUpdate(client, "UPDATE users SET username = #{username}, email = #{email}, password = #{password}, role = #{role} WHERE id = #{id}")
-      .mapFrom(TupleMapper.jsonObject());
-    delUserTmpl = SqlTemplate
-      .forQuery(client, "DELETE FROM users WHERE id = #{id}")
-      .mapTo(Row::toJson);
-
-    client.query("CREATE TABLE IF NOT EXISTS users(id INT IDENTITY, username VARCHAR(255), email VARCHAR(255), password VARCHAR(255), role VARCHAR(255))")
-      .execute()
-      .compose(res -> addUserTmpl.executeBatch(Arrays.asList(
-        new JsonObject().put("username", "admin").put("email", "admin@admin.com").put("password", "admin").put("role", "admin"),
-        new JsonObject().put("username", "febby").put("email", "febby@gmail.com").put("password", "password").put("role", "user"),
-        new JsonObject().put("username", "inyilis").put("email", "inyilis@gmail.com").put("password", "password").put("role", "user")
-        ))
-      );
-  }
-
-  public void handleLoginUser(Message<JsonObject> message) {
-    JsonObject reqBody = message.body();
+  public void handleLoginUser(RoutingContext routingContext, JDBCPool client, JWTAuth jwt) {
+    JsonObject reqBody = routingContext.getBodyAsJson();
     Map<String, Object> userLogin = new HashMap<>();
     userLogin.put("username", reqBody.getValue("username"));
     userLogin.put("password", reqBody.getValue("password"));
-    loginUserTmpl.execute(userLogin)
+
+    SqlTemplate
+      .forQuery(client, "SELECT * FROM users where username = #{username} and password = #{password}")
+      .mapTo(Row::toJson)
+      .execute(userLogin)
       .onSuccess(result -> {
         if (result.size() == 0) {
-          message.fail(404, "Not Found");
+          routingContext.fail(404);
         } else {
           Object role = result.iterator().next().getValue("ROLE");
           List<String> authorities = new ArrayList<>();
           authorities.add(role.toString());
-          message.reply(jwt.generateToken(
-            new JsonObject()
-              .put("username", reqBody.getValue("username")),
-            new JWTOptions().setExpiresInMinutes(60).setPermissions(authorities)));
+
+          routingContext.response().putHeader("Content-Type", "text/plain");
+          routingContext.response()
+            .end(jwt.generateToken(
+              new JsonObject()
+                .put("username", reqBody.getValue("username")),
+              new JWTOptions().setExpiresInMinutes(60).setPermissions(authorities)
+            ));
         }
       }).onFailure(err -> {
-        message.fail(500, "Internal Server Error");
+        routingContext.fail(500);
       });
   }
 
-  public void handleListUsers(Message message) {
+  public void handleAddUser(RoutingContext routingContext, JDBCPool client) {
+    HttpServerResponse response = routingContext.response();
+    JsonObject reqBody = routingContext.getBodyAsJson();
+
+    SqlTemplate
+      .forUpdate(client, "INSERT INTO users (username, email, password, role) VALUES (#{username}, #{email}, #{password}, #{role})")
+      .mapFrom(TupleMapper.jsonObject())
+      .execute(reqBody)
+      .onSuccess(res -> response.end(reqBody.encodePrettily()))
+      .onFailure(err -> routingContext.fail(500));
+  }
+
+  public void handleListUsers(RoutingContext routingContext, JDBCPool client) {
     client.query("SELECT * FROM users").execute(query -> {
       if (query.failed()) {
-        message.fail(500, "Internal Server Error");
+        routingContext.fail(500);
       } else {
         JsonArray arr = new JsonArray();
         query.result().forEach(row -> {
           arr.add(row.toJson());
         });
-        message.reply(arr.encode());
+        routingContext.response().putHeader("content-type", "application/json").end(arr.encode());
       }
     });
   }
 
-  public void handleGetUser(Message message) {
-    String userID = message.body().toString();
-    getUserTmpl.execute(Collections.singletonMap("id", userID))
+  public void handleGetUserById(RoutingContext routingContext, JDBCPool client) {
+    String userID = routingContext.request().getParam("userID");
+    HttpServerResponse response = routingContext.response();
+
+    SqlTemplate
+      .forQuery(client, "SELECT * FROM users WHERE id = #{id}")
+      .mapTo(Row::toJson)
+      .execute(Collections.singletonMap("id", userID))
       .onSuccess(result -> {
         if (result.size() == 0) {
-          message.fail(404, "Not Found");
+          routingContext.fail(404);
         } else {
-          message.reply(result.iterator().next().encode());
+          response
+            .putHeader("content-type", "application/json")
+            .end(result.iterator().next().encode());
         }
       }).onFailure(err -> {
-      message.fail(500, "Internal Server Error");
+      routingContext.fail(500);
     });
   }
 
-  public void handleAddUser(Message<JsonObject> message) {
-    JsonObject reqBody = message.body();
-    addUserTmpl.execute(reqBody)
-      .onSuccess(res -> message.reply(reqBody.encodePrettily()))
-      .onFailure(err -> message.fail(500, "Internal Server Error"));
+  public void handleEditUserById(RoutingContext routingContext, JDBCPool client) {
+    HttpServerResponse response = routingContext.response();
+    JsonObject user = routingContext.getBodyAsJson();
+
+    SqlTemplate
+      .forUpdate(client, "UPDATE users SET username = #{username}, email = #{email}, password = #{password}, role = #{role} WHERE id = #{id}")
+      .mapFrom(TupleMapper.jsonObject())
+      .execute(user)
+      .onSuccess(res -> response.end(user.encodePrettily()))
+      .onFailure(err -> routingContext.fail(500));
   }
 
-  public void handleEditUser(Message<JsonObject> message) {
-    JsonObject reqBody = message.body();
-    editUserTmpl.execute(reqBody)
-      .onSuccess(res -> message.reply(reqBody.encodePrettily()))
-      .onFailure(err -> message.fail(500, "Internal Server Error"));
-  }
+  public void handleDelUser(RoutingContext routingContext, JDBCPool client) {
+    String userID = routingContext.request().getParam("userID");
+    HttpServerResponse response = routingContext.response();
 
-  public void handleDelUser(Message message) {
-    String userID = message.body().toString();
-
-    delUserTmpl.execute(Collections.singletonMap("id", userID))
+    SqlTemplate
+      .forQuery(client, "DELETE FROM users WHERE id = #{id}")
+      .mapTo(Row::toJson)
+      .execute(Collections.singletonMap("id", userID))
       .onSuccess(result -> {
-        System.out.println(result.iterator());
         if (result.size() == 0) {
-          message.fail(404, "Not Found");
+          routingContext.fail(404);
         } else {
-          message.reply(String.format("Delete User with ID:%s Success!", userID));
+          response
+            .putHeader("content-type", "application/json")
+            .end();
         }
-      }).onFailure(err -> message.fail(500, "Internal Server Error"));
+      }).onFailure(err -> {
+      routingContext.fail(500);
+    });
   }
 
 }
