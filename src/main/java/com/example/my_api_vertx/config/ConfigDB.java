@@ -10,7 +10,7 @@ import java.util.Arrays;
 
 public class ConfigDB {
 
-  public JDBCPool setUp(Vertx vertx) {
+  public static JDBCPool setUp(Vertx vertx) {
 
     // Create a JDBC client with a test database
     JDBCPool client = JDBCPool.pool(vertx, new JsonObject()
