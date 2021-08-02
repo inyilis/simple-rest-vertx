@@ -1,6 +1,6 @@
 package com.example.my_api_vertx.service;
 
-import com.example.my_api_vertx.repository.UserRepository;
+import com.example.my_api_vertx.config.Query;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.jdbcclient.JDBCPool;
@@ -13,9 +13,10 @@ public class DeleteUserService {
   public static void execute(RoutingContext routingContext, JDBCPool client) {
   String userID = routingContext.request().getParam("userID");
   HttpServerResponse response = routingContext.response();
+  Query getQuery = new Query();
 
   SqlTemplate
-    .forQuery(client, UserRepository.delUser())
+    .forQuery(client, getQuery.execute("delete-user"))
     .mapTo(Row::toJson)
     .execute(Collections.singletonMap("id", userID))
     .onSuccess(result -> {

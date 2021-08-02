@@ -36,7 +36,7 @@
     }
   },
   "paths": {
-    "/user/login": {
+    "/login": {
       "post": {
         "tags": [
           "user"
@@ -71,7 +71,7 @@
         }
       }
     },
-    "/user/signup": {
+    "/signup": {
       "post": {
         "tags": [
           "user"
@@ -100,7 +100,7 @@
         }
       }
     },
-    "/user/users": {
+    "/users": {
       "get": {
         "tags": [
           "user"
@@ -165,7 +165,7 @@
         }
       }
     },
-    "/user/users/{userId}": {
+    "/users/{userId}": {
       "get": {
         "tags": [
           "user"
@@ -230,7 +230,7 @@
         }
       }
     },
-    "/task/tasks": {
+    "/tasks": {
       "post": {
         "tags": [
           "task"
@@ -327,7 +327,7 @@
         }
       }
     },
-    "/task/tasks/{taskId}": {
+    "/tasks/{taskId}": {
       "get": {
         "tags": [
           "task"

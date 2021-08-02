@@ -1,6 +1,6 @@
 package com.example.my_api_vertx.service;
 
-import com.example.my_api_vertx.repository.TaskRepository;
+import com.example.my_api_vertx.config.Query;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -11,13 +11,14 @@ import io.vertx.sqlclient.templates.TupleMapper;
 public class PutTaskService {
   public static void execute(RoutingContext routingContext, JDBCPool client) {
     HttpServerResponse response = routingContext.response();
-    JsonObject user = routingContext.getBodyAsJson();
+    JsonObject updateUser = routingContext.getBodyAsJson();
+    Query getQuery = new Query();
 
     SqlTemplate
-      .forUpdate(client, TaskRepository.editTask())
+      .forUpdate(client, getQuery.execute("update-task"))
       .mapFrom(TupleMapper.jsonObject())
-      .execute(user)
-      .onSuccess(res -> response.end(user.encodePrettily()))
+      .execute(updateUser)
+      .onSuccess(res -> response.end(updateUser.encodePrettily()))
       .onFailure(err -> routingContext.fail(500));
   }
 }

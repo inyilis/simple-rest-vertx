@@ -1,6 +1,6 @@
 package com.example.my_api_vertx.service;
 
-import com.example.my_api_vertx.repository.UserRepository;
+import com.example.my_api_vertx.config.Query;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.JWTOptions;
 import io.vertx.ext.auth.jwt.JWTAuth;
@@ -20,9 +20,10 @@ public class PostUserLoginService {
     Map<String, Object> userLogin = new HashMap<>();
     userLogin.put("username", reqBody.getValue("username"));
     userLogin.put("password", reqBody.getValue("password"));
+    Query getQuery = new Query();
 
     SqlTemplate
-      .forQuery(client, UserRepository.userLogin())
+      .forQuery(client, getQuery.execute("user-login"))
       .mapTo(Row::toJson)
       .execute(userLogin)
       .onSuccess(result -> {

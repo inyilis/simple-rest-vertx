@@ -4,6 +4,7 @@ import com.example.my_api_vertx.config.ConfigDB;
 import com.example.my_api_vertx.service.*;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.auth.PubSecKeyOptions;
 import io.vertx.ext.auth.User;
 import io.vertx.ext.auth.authorization.PermissionBasedAuthorization;
@@ -13,6 +14,7 @@ import io.vertx.ext.auth.jwt.authorization.JWTAuthorization;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.JWTAuthHandler;
+import io.vertx.ext.web.handler.StaticHandler;
 import io.vertx.jdbcclient.JDBCPool;
 
 public class MainVerticle extends AbstractVerticle {
@@ -34,7 +36,7 @@ public class MainVerticle extends AbstractVerticle {
         .setBuffer("keyboard cat")));
 
     authzProvider = JWTAuthorization.create("permissions");
-    adminAuth = PermissionBasedAuthorization.create("admin");
+//    adminAuth = PermissionBasedAuthorization.create("admin");
     userAuth = PermissionBasedAuthorization.create("user");
 
     Router router = Router.router(vertx);
@@ -67,6 +69,7 @@ public class MainVerticle extends AbstractVerticle {
     router.route("/users").handler(JWTAuthHandler.create(jwt));
     // List Users
     router.get("/users").handler(routingContext -> {
+      adminAuth = PermissionBasedAuthorization.create("admin");
       User user = routingContext.user();
       authzProvider.getAuthorizations(user).onComplete(ar -> {
         if (ar.succeeded()) {
@@ -98,6 +101,7 @@ public class MainVerticle extends AbstractVerticle {
     router.route("/tasks").handler(JWTAuthHandler.create(jwt));
     // Authorization
     router.route("/tasks").handler(routingContext -> {
+      adminAuth = PermissionBasedAuthorization.create("admin");
       User user = routingContext.user();
       authzProvider.getAuthorizations(user).onComplete(ar -> {
         if (ar.succeeded()) {
@@ -133,7 +137,7 @@ public class MainVerticle extends AbstractVerticle {
       DeleteTaskService.execute(routingContext, client);
     });
 
-//    router.route("/doc/*").handler(StaticHandler.create().setCachingEnabled(false).setWebRoot("webroot/swagger-ui-dist"));
+    router.route("/swagger/*").handler(StaticHandler.create().setCachingEnabled(false).setWebRoot("webroot/swagger-ui-dist"));
 
   }
 

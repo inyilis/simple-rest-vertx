@@ -1,0 +1,12 @@
+user-login: "SELECT * FROM users where username = #{username} and password = #{password}"
+user-signup: "INSERT INTO users (username, email, password, role) VALUES (#{username}, #{email}, #{password}, #{role})"
+select-all-users: "SELECT * FROM Users"
+select-user-by-id: "SELECT * FROM users WHERE id = #{id}"
+update-user: "UPDATE users SET username = #{username}, email = #{email}, password = #{password}, role = #{role} WHERE id = #{id}"
+delete-user: "DELETE FROM users WHERE id = #{id}"
+
+insert-task: "INSERT INTO tasks (name, user_id) VALUES (#{name}, #{user_id})"
+select-all-task: "SELECT * FROM tasks"
+select-task-by-id: "SELECT * FROM tasks WHERE id = #{id}"
+update-task: "UPDATE tasks SET name = #{name}, user_id = #{user_id} WHERE id = #{id}"
+delete-task: "DELETE FROM tasks WHERE id = #{id}"

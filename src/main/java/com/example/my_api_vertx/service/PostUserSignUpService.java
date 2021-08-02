@@ -1,6 +1,6 @@
 package com.example.my_api_vertx.service;
 
-import com.example.my_api_vertx.repository.UserRepository;
+import com.example.my_api_vertx.config.Query;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -12,9 +12,10 @@ public class PostUserSignUpService {
   public static void execute(RoutingContext routingContext, JDBCPool client) {
     HttpServerResponse response = routingContext.response();
     JsonObject reqBody = routingContext.getBodyAsJson();
+    Query getQuery = new Query();
 
     SqlTemplate
-      .forUpdate(client, UserRepository.userSignUp())
+      .forUpdate(client, getQuery.execute("user-signup"))
       .mapFrom(TupleMapper.jsonObject())
       .execute(reqBody)
       .onSuccess(res -> response.end(reqBody.encodePrettily()))
